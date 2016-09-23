@@ -1,0 +1,35 @@
+---
+title: "Twitter Troll Project"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Collecting data
+Tutorial: R Twitter mining:
+<https://www.youtube.com/watch?v=lT4Kosc_ers>.
+
+Authorization
+```{r,oauth}
+library('RCurl')
+library('twitteR')
+
+source('twitter_api.R')
+
+setup_twitter_oauth(consumer_key, consumer_secret,
+                    access_token, access_secret)
+```
+
+Download Tweets:
+```{r}
+trump_tweets = searchTwitter('Trump', n = 10, lang = 'en')
+# How to pick n?
+trump_tweets
+```
+
+## Methods
+English swear words list: <http://www.youswear.com/index.asp?language=English>.
+
+Grab the usernames from all tweets: compute the frequency of swear words in their tweets.
