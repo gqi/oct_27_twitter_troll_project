@@ -1,35 +1,97 @@
 ---
 title: "Twitter Troll Project"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Collecting data
-Tutorial: R Twitter mining:
-<https://www.youtube.com/watch?v=lT4Kosc_ers>.
+## Definition of troll
+In my definition, Twitter trolls includes two categories:
 
-Authorization
-```{r,oauth}
+(1) If a person's tweets often contain swear words. 
+
+(2) If a person's tweets often spark many comments that contain swear words. These tweets may not contain curse words, but they are provocative in nature. The comments, which is a large pool, are highly likely to contain swear words.
+
+(3) People interacting with many trolls.
+
+## Collecting data
+### Retrieve user list
+We cannot work with all Twitter users since this pool is too big. Instead, we work with the 100 most followed users <http://twittercounter.com/pages/100>.
+Grab all users in this list:
+
+First load packages:
+```{r, load_package}
 library('RCurl')
 library('twitteR')
+library('readr')
+library(dplyr)
+library(stringr)
+```
 
+```{r, grab_users}
+setwd('/Users/guanghaoqi/Documents/Adv_data_science/twitter_troll_project')
+accounts = read_lines("raw_data/top_twitter_accounts.txt")
+accounts = accounts[grepl('@',accounts)]
+accounts = gsub('.*@','',accounts)
+accounts = gsub('Featured user:','',accounts)
+```
+### Downloading tweets
+Tutorial: R Twitter mining:
+<https://www.youtube.com/watch?v=lT4Kosc_ers>.
+First, get API authorization:
+```{r,oauth}
 source('twitter_api.R')
-
-setup_twitter_oauth(consumer_key, consumer_secret,
-                    access_token, access_secret)
+setup_twitter_oauth(consumer_key, consumer_secret, access_token, access_secret)
 ```
 
-Download Tweets:
+Next, search tweets based on the information above. For each account in the top 100 list, request 100 tweets from Twitter. This step was completed in multiple attempts due to API rate limits. 
+```{r, download_tweets}
+# tweets = vector('list', length = length(accounts))
+# acct.search = paste0('from:',accounts)
+# 
+# for (i in 1:length(accounts)){
+#     tweets[[i]] = searchTwitter(acct.search[[i]], n = 100, lang = 'en')
+# }
+# save(tweets, file = 'raw_data/tweets_top100.RData')
+```
+Different users allow access to different numbers of tweets:
 ```{r}
-trump_tweets = searchTwitter('Trump', n = 10, lang = 'en')
-# How to pick n?
-trump_tweets
+load('raw_data/tweets_top100.RData')
+tweet_count = sapply(tweets,length)
+plot(1:length(accounts),tweet_count, xlab = 'Rank by # of followers', ylab = '# of tweets accessible')
+```
+View texts
+```{r}
+test = tweets[[1]][[1]]@.xData$text
+print(test)
+class(test)
 ```
 
-## Methods
-English swear words list: <http://www.youswear.com/index.asp?language=English>.
+### English swear words list:
 
-Grab the usernames from all tweets: compute the frequency of swear words in their tweets.
+<http://www.youswear.com/index.asp?language=English> and <http://www.noswearing.com/dictionary>. I'm using the latter one because it's richer. Due to the small number of accessible tweets of some accounts, we may not identify any of the words in a small disctionary. We compute the frequency of swear words in each person's tweets.
+```{r}
+swear = read_lines('raw_data/swearwords.txt')
+swear = swear[swear!='']
+# Now clean the curse words dictionary swear and save it i vector swear.cl
+swear.cl = swear %>% sapply(strsplit, split = ' - ') %>%
+    unlist %>% unique
+head(swear.cl)
+```
+
+Frequency of the swear words:
+how to retrieve strings from S4 class?
+```{r, feq_swear}
+
+```
+
+## Next step for data collection
+(1) Number of times a tweet is retweeted.
+(2) Scrape the comments of the tweets.
+
+<!-- 2. Retrieve user information -->
+<!-- ```{r,userinfo} -->
+<!-- swift.info = lookupUsers('taylorswift13') -->
+<!-- ``` -->
