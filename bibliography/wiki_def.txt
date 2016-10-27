@@ -1,0 +1,7 @@
+@misc{ wiki:xxx,
+   author = "Wikipedia",
+   title = "Internet troll --- Wikipedia{,} The Free Encyclopedia",
+   year = "2016",
+   url = "https://en.wikipedia.org/w/index.php?title=Internet_troll&oldid=744507751",
+   note = "[Online; accessed 15-October-2016]"
+}
