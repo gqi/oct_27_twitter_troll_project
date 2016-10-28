@@ -119,16 +119,8 @@ $(document).ready(function () {
 </div>
 
 
-<p>Load packages for the analysis.</p>
-<pre class="r"><code>library('RCurl')
-library('twitteR')
-library('readr')
-library(rvest)
-library(dplyr)
-if (!('wordcloud' %in% row.names(installed.packages()))){
-    install.packages('wordcloud')
-}
-library(wordcloud)</code></pre>
+<p>Load the wordcloud package for word frequency visualization. Please install it before running the code.</p>
+<pre class="r"><code>library(wordcloud)</code></pre>
 <div id="training-data" class="section level2">
 <h2>1. Training data</h2>
 <div id="load-training-data" class="section level3">

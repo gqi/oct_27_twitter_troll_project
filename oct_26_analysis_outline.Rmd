@@ -7,16 +7,8 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Load packages for the analysis.
+Load the wordcloud package for word frequency visualization. Please install it before running the code.
 ```{r load_pkg, message=FALSE}
-library('RCurl')
-library('twitteR')
-library('readr')
-library(rvest)
-library(dplyr)
-if (!('wordcloud' %in% row.names(installed.packages()))){
-    install.packages('wordcloud')
-}
 library(wordcloud)
 ```
 
