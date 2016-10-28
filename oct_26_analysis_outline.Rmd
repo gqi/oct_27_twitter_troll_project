@@ -8,15 +8,20 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 Load packages for the analysis.
-```{r load_pkg}
+```{r load_pkg, message=FALSE}
 library('RCurl')
 library('twitteR')
 library('readr')
 library(rvest)
 library(dplyr)
+if (!('wordcloud' %in% row.names(installed.packages()))){
+    install.packages('wordcloud')
+}
+library(wordcloud)
 ```
 
-## Load training data
+## 1. Training data
+### 1.1 Load training data
 The training data are tweets from the 100 most followed Twitter accounts. First we load their user names into R.
 ```{r load_names}
 top100followed = read.table('raw_data/oct_16_top100followed_twitter_accounts.txt',stringsAsFactors = FALSE)[,1]
@@ -24,7 +29,7 @@ top100followed.clean = gsub(' ', '_', top100followed)
 head(top100followed.clean)
 ```
 
-Now we load the tweets commenting on each of the top 100 accounts. Due to API limits, we only managed to download the tweets for the top 74, and the actual retrieved tweets may be fewer than the requested ones.
+Now we load the tweets commenting on each of the top 100 accounts. Due to API limits, we only managed to download the tweets for the top 74, and the actual retrieved tweets may be fewer than the requested number.
 ```{r load_train_tweets}
 top100tweets = list()
 for (name in top100followed.clean[1:74]){ # Since we only have data for the first 74
@@ -35,8 +40,8 @@ alltweets = do.call(c, top100tweets)
 head(alltweets)
 ```
 
-## Clean data
-Put potentially useful information into a data frame. The following variables are included: name of the sender, the text,its favorite count and retweet count.
+### 1.2 Clean data
+Put potentially useful information into a data frame. The following variables are included: name of the sender, the text, its favorite count and retweet count.
 ```{r data_frame}
 namelist = sapply(alltweets, function(x) x@.xData$screenName)
 data.clean = data.frame(screenName = namelist, stringsAsFactors = FALSE)
@@ -53,8 +58,13 @@ for (attri in c('followersCount', 'favoritesCount', 'friendsCount')){
     data.clean[, attri] = sapply(data.clean$screenName,  function(x) ifelse(x %in% users.scrnames, users[[which(users.scrnames == x)]]@.xData[[attri]], NA))
 }
 ```
+View the dimension of the training data.
+```{r}
+print(dim(data.clean))
+```
 
-## Step 1: word frequency calculation and screening
+## 2. Two-step troll tweets detection procedure
+### 2.1 Word frequency screening
 Load 3 lists of bad words and a list of common words.
 ```{r}
 swear = tolower(read.table('raw_data/swearwords_clean_oct_17.txt', stringsAsFactors = FALSE)[,1])
@@ -88,7 +98,7 @@ for (i in 1:nrow(data.clean)){
     }
 }
 ```
-For each tweet, record the number of words that appear in each list.
+For each tweet, record the number of words that appear in each list, including swear (L1), insult (L2) and bad (L3).
 ```{r}
 negwordsNum = matrix(nrow = length(matchwords), ncol = 3)
 for (i in 1:nrow(negwordsNum)){
@@ -123,6 +133,13 @@ for (i in 1:3){
 }
 ```
 
+Plot word cloud by frequency of the negative words
+```{r wordcloud}
+set.seed(5642)
+matchwords.tab = table(do.call(c, matchwords))
+wordcloud(names(matchwords.tab), as.vector(matchwords.tab), random.order = FALSE)
+```
+
 Store the word counts in the data frame.
 ```{r}
 data.clean$swearNum = negwordsNum[,1] # L1
@@ -135,9 +152,19 @@ Filter the tweets that contain at least one negative word
 ```{r}
 data.modelfit = data.clean[rowSums(negwordsNum) > 0,]
 data.modelfit = data.modelfit[complete.cases(data.modelfit),]
+dim(data.modelfit)
 ```
 
-## Step 2: logistic regression classification
+### 2.2 Logistic regression classification
+Before fitting the model, we view the distribution of the user profile variables friends count (FrC), follower count (FoC) and total favorite count (FaC) in the tweets that pass the word frequency screening.
+```{r FC_distri}
+par(mfrow = c(1,3), mar = c(5, 4, 4, 2) + 0.1)
+hist(data.modelfit$friendsCount, xlab = 'Friend count (FrC)', main = '', breaks = 30)
+hist(data.modelfit$followersCount, xlab = 'Follower count (FoC)', main = '', breaks = 30)
+hist(data.modelfit$favoritesCount, xlab = 'Total favorite count (FaC)', main = '', breaks = 30)
+```
+
+
 We have randomly sampled 200 tweets to train logistic model. Now load their indices and manually label them.
 ```{r}
 logistic.inds = read.table('processed_data/oct_23_logistic_inds_for_manual.txt')[,1]
@@ -169,17 +196,17 @@ testmod = glm(isTroll ~ favoritesCount,
 summary(testmod)
 ```
 
-
-
 Fit logistic prediction model.
-```{r}
+```{r logitfit, message=FALSE}
 mod = glm(isTroll ~ swearNum + insultNum + badNum + friendsCount, 
           data = data.logit, family = binomial)
 mod = step(mod, direction = 'backward')
-summary(mod)
+print(summary(mod))
 ```
 
-## Model evaluation
+## 3. Model evaluation
+
+### 3.1 Test data set
 Load and proprocess the test data exactly the same was as the training data.
 ```{r}
 load('raw_data/oct_9_pitt_jolie_tweets.RData')
@@ -245,13 +272,14 @@ data.clean.pitt$insultNum = negwordsNum.pitt.jolie[,2]
 data.clean.pitt$badNum = negwordsNum.pitt.jolie[,3]
 data.clean.pitt$negNum = rowSums(negwordsNum.pitt.jolie)
 ```
-First step screening by word counts
+### 3.2 Word frequency screening
 ```{r}
 indices = which(rowSums(negwordsNum.pitt.jolie)>0)
 data.clean.pitt.logit = data.clean.pitt[indices,]
 ```
 
-Predict the troll tweets using the logistic model fitted using the training set. The cutoff for predicted probability is 1 - (proportion of troll tweeets in training set). We want to keep the proportion of detected trolls the same as that of the training data. Print the 
+### 3.3 Logistic regression model prediction
+Predict the troll tweets using the logistic model fitted using the training set. The cutoff for predicted probability is 1 - (proportion of troll tweets in 200 randomly selected training tweets). We want to keep the proportion of detected trolls almost the same as that of the training data. 
 ```{r}
 pred.pitt.jolie = predict(mod, data.clean.pitt.logit, type = 'response')
 pcutoff = quantile(pred.pitt.jolie, 1 - mean(data.logit$isTroll))
@@ -277,10 +305,11 @@ names(sens.spec) = c('Sensitivity', 'Specificity')
 print(sens.spec)
 ```
 
+Detected trolls and their category.
 ```{r}
 trollusers = data.clean.pitt.logit[trollinds.pred.pitt ==TRUE, c('screenName','followersCount')]
 trollusers$influentialTroll = ifelse(trollusers$followersCount>819,
-                                     'Yes', 'No')
+                                     'Star', 'Common')
 print(trollusers)
 # 95th percentile is 819 (https://www.oreilly.com/ideas/tweets-loud-and-quiet)
 
